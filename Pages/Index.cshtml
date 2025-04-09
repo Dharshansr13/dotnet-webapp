@@ -1,0 +1,36 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Dharshan 🔥";
+}
+
+<style>
+    body {
+        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+        color: #fff;
+        font-family: 'Segoe UI', sans-serif;
+        text-align: center;
+        padding-top: 15%;
+        animation: fadeIn 2s ease-in-out;
+    }
+
+    h1 {
+        font-size: 3rem;
+        background: linear-gradient(to right, #ff416c, #ff4b2b);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: glow 1.5s infinite alternate;
+    }
+
+    @@keyframes glow {
+        from { text-shadow: 0 0 10px #ff416c; }
+        to   { text-shadow: 0 0 20px #ff4b2b; }
+    }
+
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+<h1>🔥 Dharshan your stylish boy gonna be rich and glory 💸✨</h1>

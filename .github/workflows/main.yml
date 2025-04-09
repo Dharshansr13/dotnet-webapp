@@ -40,10 +40,10 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Install Docker
+      - name: Install Docker via Script (Fix Conflicts)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y docker.io
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sudo sh get-docker.sh
 
       - name: Build .NET App
         run: dotnet publish -c Release -o out
@@ -70,8 +70,8 @@ jobs:
           username: ubuntu
           key: ${{ secrets.DOCKER_VM_KEY }}
           script: |
-            docker stop dotnet-webapp || true
-            docker rm dotnet-webapp || true
-            docker rmi dotnet-webapp-image || true
+            docker stop dotnet-webapp 2>/dev/null || true
+            docker rm dotnet-webapp 2>/dev/null || true
+            docker rmi dotnet-webapp-image 2>/dev/null || true
             docker load < image.tar
             docker run -d -p 80:80 --name dotnet-webapp dotnet-webapp-image

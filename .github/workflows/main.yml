@@ -35,24 +35,43 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Docker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker.io
+
       - name: Build .NET App
         run: dotnet publish -c Release -o out
 
       - name: Build Docker Image
         run: docker build -t dotnet-webapp-image .
 
+      - name: Save Docker Image to File
+        run: docker save dotnet-webapp-image -o image.tar
+
       - name: Copy Docker Image to Remote VM
         uses: appleboy/scp-action@v0.1.7
         with:
           host: 65.2.39.233
           username: ubuntu
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.DOCKER_VM_KEY }}
+          source: image.tar
+          target: /home/ubuntu/
+
+      - name: Run Docker Container on Remote VM
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: 65.2.39.233
+          username: ubuntu
+          key: ${{ secrets.DOCKER_VM_KEY }}
           script: |
             docker stop dotnet-webapp || true
             docker rm dotnet-webapp || true
             docker rmi dotnet-webapp-image || true
             docker load < image.tar
             docker run -d -p 80:80 --name dotnet-webapp dotnet-webapp-image
-
-      - name: Save Docker image
-        run: docker save dotnet-webapp-image -o image.tar

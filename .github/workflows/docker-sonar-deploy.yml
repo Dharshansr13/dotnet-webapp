@@ -6,7 +6,7 @@ on:
       - main
 
 permissions:
-  contents: write  # Required to push git tags
+  contents: write
 
 env:
   SONAR_HOST_URL: "http://13.126.124.58:9000"
@@ -81,3 +81,14 @@ jobs:
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git tag $NEXT_TAG
         git push origin $NEXT_TAG
+
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 13.126.124.58
+        username: ubuntu
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          docker pull dharshansr/murali_lanister:latest
+          docker stop murali || true && docker rm murali || true
+          docker run -d -p 70:80 --name murali dharshansr/murali_lanister:latest

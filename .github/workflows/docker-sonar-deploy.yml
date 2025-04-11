@@ -54,7 +54,7 @@ jobs:
           NEXT_TAG="${TAG_PREFIX}1"
         fi
         echo "NEXT_TAG=$NEXT_TAG" >> $GITHUB_ENV
-        echo "Docker image will be tagged: $NEXT_TAG"
+        echo "Docker image will be tagged as $NEXT_TAG"
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -75,9 +75,9 @@ jobs:
           ${{ env.DOCKER_IMAGE }}:latest
           ${{ env.DOCKER_IMAGE }}:${{ env.NEXT_TAG }}
 
-    - name: Create Git Tag
+    - name: Create Git Tag and Push
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git tag ${{ env.NEXT_TAG }}
-        git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} ${{ env.NEXT_TAG }}
+        git tag $NEXT_TAG
+        git push origin $NEXT_TAG

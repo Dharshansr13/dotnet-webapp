@@ -14,6 +14,9 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       DOCKER_USERNAME: dharshansr
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_USER: ${{ secrets.EC2_USER }}
+      EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
 
     steps:
       - name: Checkout code
@@ -31,7 +34,7 @@ jobs:
 
       - name: Begin SonarQube analysis
         run: dotnet sonarscanner begin /k:"dotnet-webapp" /d:sonar.host.url="http://13.233.132.196:9000" /d:sonar.login="${{ env.SONAR_TOKEN }}"
-        
+
       - name: Restore dependencies
         run: dotnet restore
 
@@ -73,3 +76,9 @@ jobs:
         run: |
           docker push dharshansr/stylishboy:latest
           docker push dharshansr/stylishboy:${{ steps.get_version.outputs.tag }}
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC

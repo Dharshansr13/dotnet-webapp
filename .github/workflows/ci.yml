@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build and Analyze
+    name: Build, Analyze, Tag & Push
     runs-on: ubuntu-latest
 
     env:
@@ -18,11 +18,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Needed for git tags
 
-      - name: Setup .NET
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '8.0.x' # Adjust based on your project
+          dotnet-version: '8.0.x'
 
       - name: Install SonarScanner
         run: dotnet tool install --global dotnet-sonarscanner
@@ -42,8 +44,32 @@ jobs:
       - name: Log in to Docker Hub
         run: echo "${{ env.DOCKER_PASSWORD }}" | docker login -u "${{ env.DOCKER_USERNAME }}" --password-stdin
 
-      - name: Build Docker image
-        run: docker build -t dharshansr/stylishboy:latest .
+      - name: Get latest version tag
+        id: get_version
+        run: |
+          git fetch --tags
+          latest_tag=$(git tag --sort=-v:refname | grep '^v[0-9]*$' | head -n 1)
+          if [ -z "$latest_tag" ]; then
+            next_tag="v1"
+          else
+            next_number=$(echo $latest_tag | sed 's/v//')
+            next_tag="v$((next_number + 1))"
+          fi
+          echo "Next tag: $next_tag"
+          echo "tag=$next_tag" >> $GITHUB_OUTPUT
 
-      - name: Push Docker image
-        run: docker push dharshansr/stylishboy:latest
+      - name: Create Git tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.get_version.outputs.tag }}
+          git push origin ${{ steps.get_version.outputs.tag }}
+
+      - name: Build Docker image
+        run: |
+          docker build -t dharshansr/stylishboy:latest -t dharshansr/stylishboy:${{ steps.get_version.outputs.tag }} .
+
+      - name: Push Docker images
+        run: |
+          docker push dharshansr/stylishboy:latest
+          docker push dharshansr/stylishboy:${{ steps.get_version.outputs.tag }}

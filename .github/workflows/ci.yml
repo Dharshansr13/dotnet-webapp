@@ -1,0 +1,49 @@
+name: .NET CI with SonarQube and Docker
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build and Analyze
+    runs-on: ubuntu-latest
+
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      DOCKER_USERNAME: dharshansr
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '7.x' # Adjust based on your project
+
+      - name: Install SonarScanner
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      - name: Begin SonarQube analysis
+        run: dotnet sonarscanner begin /k:"dotnet-webapp" /d:sonar.host.url="http://13.233.132.196:9000" /d:sonar.login="${{ env.SONAR_TOKEN }}"
+        
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build project
+        run: dotnet build --no-restore
+
+      - name: End SonarQube analysis
+        run: dotnet sonarscanner end /d:sonar.login="${{ env.SONAR_TOKEN }}"
+
+      - name: Log in to Docker Hub
+        run: echo "${{ env.DOCKER_PASSWORD }}" | docker login -u "${{ env.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build Docker image
+        run: docker build -t dharshansr/stylishboy:latest .
+
+      - name: Push Docker image
+        run: docker push dharshansr/stylishboy:latest

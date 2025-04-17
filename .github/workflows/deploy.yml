@@ -1,4 +1,4 @@
-name: Build and Analyze
+name: Build, Analyze, Push & Deploy Boltlan App
 
 on:
   push:
@@ -6,11 +6,11 @@ on:
       - main
 
 jobs:
-  build:
+  build-analyze-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v2
 
       - name: Set up .NET
@@ -21,13 +21,36 @@ jobs:
       - name: Install SonarScanner for .NET
         run: dotnet tool install --global dotnet-sonarscanner
 
-      - name: Start SonarQube analysis
+      - name: SonarQube Analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          dotnet-sonarscanner begin /k:"your_project_key" /d:sonar.host.url="http://13.126.27.18:9000" /d:sonar.login="$SONAR_TOKEN"
+          dotnet-sonarscanner begin /k:"boltlan" /d:sonar.host.url="http://13.126.27.18:9000" /d:sonar.login="$SONAR_TOKEN"
           dotnet build
           dotnet-sonarscanner end /d:sonar.login="$SONAR_TOKEN"
 
-      - name: Publish build artifacts
-        run: echo "Build completed"
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Build Docker Image for Boltlan
+        run: |
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/boltlan-app:latest .
+
+      - name: Push Docker Image to Docker Hub
+        run: |
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/boltlan-app:latest
+
+      - name: Deploy to Remote VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/boltlan-app:latest
+            docker stop boltlan || true
+            docker rm boltlan || true
+            docker run -d --name boltlan -p 80:80 ${{ secrets.DOCKER_HUB_USERNAME }}/boltlan-app:latest

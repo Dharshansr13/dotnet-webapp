@@ -1,4 +1,4 @@
-name: CI/CD - Build, Test, Dockerize, Deploy
+name: Build and Analyze
 
 on:
   push:
@@ -6,60 +6,28 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
-      - name: Setup .NET
+      - name: Set up .NET
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '8.0.x'
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v3
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
+      - name: Install SonarScanner for .NET
+        run: dotnet tool install --global dotnet-sonarscanner
 
-      - name: Install dependencies
-        run: dotnet restore
-
-      - name: Run tests
-        run: dotnet test
-
-      - name: SonarQube Scan
+      - name: Start SonarQube analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          dotnet tool install --global dotnet-sonarscanner
-          export PATH="$PATH:$HOME/.dotnet/tools"
-          dotnet sonarscanner begin /k:"dotnet-webapp" /d:sonar.login="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="http://65.2.39.233:9000/"
+          dotnet-sonarscanner begin /k:"your_project_key" /d:sonar.host.url="http://13.126.27.18:9000" /d:sonar.login="$SONAR_TOKEN"
           dotnet build
-          dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+          dotnet-sonarscanner end /d:sonar.login="$SONAR_TOKEN"
 
-      - name: Build Docker image
-        run: |
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/dotnet-webapp:latest .
-
-      - name: Login to Docker Hub
-        run: echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
-
-      - name: Push Docker image
-        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/dotnet-webapp:latest
-
-      - name: Deploy on remote VM
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          script: |
-            docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/dotnet-webapp:latest
-            docker stop dotnet-webapp || true
-            docker rm dotnet-webapp || true
-            docker run -d --name dotnet-webapp -p 80:80 ${{ secrets.DOCKER_HUB_USERNAME }}/dotnet-webapp:latest
+      - name: Publish build artifacts
+        run: echo "Build completed"

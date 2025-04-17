@@ -1,69 +1,65 @@
-name: CI/CD Pipeline
+name: CI/CD - Build, Test, Dockerize, Deploy
 
 on:
   push:
     branches:
-      - main # Trigger on push to main branch
+      - main
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
 
-    - name: Cache Docker layers
-      uses: actions/cache@v2
-      with:
-        path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-docker-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-docker-
+      - name: Cache NuGet packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
-    - name: Set up .NET SDK
-      uses: actions/setup-dotnet@v2
-      with:
-        dotnet-version: '8.0'
+      - name: Install dependencies
+        run: dotnet restore
 
-    - name: Build and Publish .NET App
-      run: |
-        docker build -t dharshansr/murali_lanister:latest .
-        docker run --rm dharshansr/murali_lanister:latest
+      - name: Run tests
+        run: dotnet test
 
-    - name: Run SonarQube Analysis
-      env:
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      run: |
-        docker run --rm \
-          -v $(pwd):/usr/src \
-          sonarsource/sonar-scanner-cli \
-          -Dsonar.projectKey=dharshan-web-app \
-          -Dsonar.sources=. \
-          -Dsonar.host.url=http://65.2.39.233:9000 \
-          -Dsonar.login=$SONAR_TOKEN
+      - name: SonarQube Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          dotnet tool install --global dotnet-sonarscanner
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet sonarscanner begin /k:"dotnet-webapp" /d:sonar.login="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="http://65.2.39.233:9000/"
+          dotnet build
+          dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
 
-    - name: Build Docker Image
-      run: |
-        docker build -t dharshansr/murali_lanister:latest .
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/dotnet-webapp:latest .
 
-    - name: Push Docker Image to Docker Hub
-      run: |
-        echo ${{ secrets.DOCKER_HUB_TOKEN }} | docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin
-        docker push dharshansr/murali_lanister:latest
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
 
-    - name: Deploy to VM
-      env:
-        VM_HOST: ${{ secrets.VM_HOST }}
-        VM_USER: ${{ secrets.VM_USER }}
-        VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
-      run: |
-        echo "$VM_SSH_KEY" > private_key.pem
-        chmod 600 private_key.pem
-        ssh -o StrictHostKeyChecking=no -i private_key.pem $VM_USER@$VM_HOST << 'EOF'
-          docker pull dharshansr/murali_lanister:latest
-          docker run -d -p 80:80 dharshansr/murali_lanister:latest
-        EOF
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/dotnet-webapp:latest
+
+      - name: Deploy on remote VM
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/dotnet-webapp:latest
+            docker stop dotnet-webapp || true
+            docker rm dotnet-webapp || true
+            docker run -d --name dotnet-webapp -p 80:80 ${{ secrets.DOCKER_HUB_USERNAME }}/dotnet-webapp:latest

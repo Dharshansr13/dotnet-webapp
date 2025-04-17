@@ -50,7 +50,8 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
-            docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/boltlan-app:latest
-            docker stop boltlan || true
-            docker rm boltlan || true
-            docker run -d --name boltlan -p 80:80 ${{ secrets.DOCKER_HUB_USERNAME }}/boltlan-app:latest
+            # Docker commands with sudo if necessary
+            sudo docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/boltlan-app:latest
+            sudo docker stop boltlan || true
+            sudo docker rm boltlan || true
+            sudo docker run -d --name boltlan -p 80:80 ${{ secrets.DOCKER_HUB_USERNAME }}/boltlan-app:latest
